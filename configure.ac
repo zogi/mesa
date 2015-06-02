@@ -53,6 +53,10 @@ mingw*)
     ;;
 esac
 
+# empty default flags
+: ${CFLAGS=""}
+: ${CXXFLAGS=""}
+
 # Support silent build rules, requires at least automake-1.11. Disable
 # by either passing --disable-silent-rules to configure or passing V=1
 # to make
@@ -1668,8 +1672,12 @@ if test "x$enable_opencl" = xyes; then
                     PKG_CONFIG_PATH environment variable.
                     By default libclc.pc is installed to /usr/local/share/pkgconfig/])
     else
-        LIBCLC_INCLUDEDIR=`$PKG_CONFIG --variable=includedir libclc`
-        LIBCLC_LIBEXECDIR=`$PKG_CONFIG --variable=libexecdir libclc`
+        if test -z "$LIBCLC_INCLUDEDIR"; then
+            LIBCLC_INCLUDEDIR=`$PKG_CONFIG --variable=includedir libclc`
+        fi
+        if test -z "$LIBCLC_LIBEXECDIR"; then
+            LIBCLC_LIBEXECDIR=`$PKG_CONFIG --variable=libexecdir libclc`
+        fi
         AC_SUBST([LIBCLC_INCLUDEDIR])
         AC_SUBST([LIBCLC_LIBEXECDIR])
     fi
