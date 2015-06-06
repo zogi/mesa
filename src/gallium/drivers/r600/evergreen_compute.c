@@ -659,6 +659,9 @@ void evergreen_set_cs_sampler_view(struct pipe_context *ctx_,
 		unsigned start_slot, unsigned count,
 		struct pipe_sampler_view **views)
 {
+	if (!views)
+		return;
+
 	struct r600_pipe_sampler_view **resource =
 		(struct r600_pipe_sampler_view **)views;
 
@@ -666,7 +669,7 @@ void evergreen_set_cs_sampler_view(struct pipe_context *ctx_,
 		if (resource[i]) {
 			assert(i+1 < 12);
 			/* XXX: Implement */
-			assert(!"Compute samplers not implemented.");
+			//assert(!"Compute samplers not implemented.");
 			///FETCH0 = VTX0 (param buffer),
 			//FETCH1 = VTX1 (global buffer pool), FETCH2... = TEX
 		}
