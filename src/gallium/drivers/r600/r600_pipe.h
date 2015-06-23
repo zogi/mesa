@@ -622,7 +622,9 @@ boolean evergreen_is_format_supported(struct pipe_screen *screen,
 				      unsigned usage);
 void evergreen_init_color_surface(struct r600_context *rctx,
 				  struct r600_surface *surf);
-void evergreen_init_color_surface_rat(struct r600_context *rctx,
+void evergreen_init_color_surface_rat_buf(struct r600_context *rctx,
+					struct r600_surface *surf);
+void evergreen_init_color_surface_rat_tex(struct r600_context *rctx,
 					struct r600_surface *surf);
 void evergreen_update_db_shader_control(struct r600_context * rctx);
 

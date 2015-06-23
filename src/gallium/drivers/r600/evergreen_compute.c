@@ -99,8 +99,40 @@ struct r600_resource* r600_compute_buffer_alloc_vram(
 	return (struct r600_resource *)buffer;
 }
 
+static void evergreen_set_cbuf(
+	struct r600_context *ctx,
+	unsigned id,
+	struct pipe_surface *surf)
+{
+	struct pipe_framebuffer_state *state = &ctx->framebuffer.state;
 
-static void evergreen_set_rat(
+	/* Add the RAT to the list of color buffers */
+	state->cbufs[id] = surf;
+
+	/* Update the number of color buffers */
+	state->nr_cbufs = MAX2(id + 1, state->nr_cbufs);
+
+	/* cb_target_mask should be 0 for compute resources. */
+	ctx->compute_cb_target_mask &= ~(0xf << (id << 2));
+}
+
+static void evergreen_unset_cbuf(
+	struct r600_context *ctx,
+	unsigned id)
+{
+	unsigned i;
+	struct pipe_framebuffer_state *state = &ctx->framebuffer.state;
+
+	state->cbufs[id] = NULL;
+	for (i = state->nr_cbufs; i > 0; --i) {
+		if (state->cbufs[i - 1]) {
+			break;
+		}
+	}
+	state->nr_cbufs = i;
+}
+
+static void evergreen_set_rat_buf(
 	struct r600_context *ctx,
 	unsigned id,
 	struct r600_resource* bo,
@@ -123,23 +155,11 @@ static void evergreen_set_rat(
 	rat_templ.u.tex.first_layer = 0;
 	rat_templ.u.tex.last_layer = 0;
 
-	/* Add the RAT the list of color buffers */
-	ctx->framebuffer.state.cbufs[id] = ctx->b.b.create_surface(
-		(struct pipe_context *)ctx,
-		(struct pipe_resource *)bo, &rat_templ);
-
-	/* Update the number of color buffers */
-	ctx->framebuffer.state.nr_cbufs =
-		MAX2(id + 1, ctx->framebuffer.state.nr_cbufs);
-
-	/* Update the cb_target_mask
-	 * XXX: I think this is a potential spot for bugs once we start doing
-	 * GL interop.  cb_target_mask may be modified in the 3D sections
-	 * of this driver. */
-	ctx->compute_cb_target_mask |= (0xf << (id * 4));
+	evergreen_set_cbuf(ctx, id, ctx->b.b.create_surface(
+		(struct pipe_context *)ctx, (struct pipe_resource *)bo, &rat_templ));
 
 	surf = (struct r600_surface*)ctx->framebuffer.state.cbufs[id];
-	evergreen_init_color_surface_rat(rctx, surf);
+	evergreen_init_color_surface_rat_buf(ctx, surf);
 }
 
 static void evergreen_cs_set_vertex_buffer(
@@ -436,6 +456,8 @@ static void compute_emit_cs(struct r600_context *ctx, const uint *block_layout,
 	/* XXX support more than 8 colorbuffers (the offsets are not a multiple of 0x3C for CB8-11) */
 	for (i = 0; i < 8 && i < ctx->framebuffer.state.nr_cbufs; i++) {
 		struct r600_surface *cb = (struct r600_surface*)ctx->framebuffer.state.cbufs[i];
+		if (!cb)
+			continue;
 		unsigned reloc = r600_context_bo_reloc(&ctx->b, &ctx->b.rings.gfx,
 						       (struct r600_resource*)cb->base.texture,
 						       RADEON_USAGE_READWRITE,
@@ -629,32 +651,34 @@ static void evergreen_set_compute_resources(struct pipe_context * ctx_,
 		struct pipe_surface ** surfaces)
 {
 	struct r600_context *ctx = (struct r600_context *)ctx_;
-	struct r600_surface **resources = (struct r600_surface **)surfaces;
+	struct pipe_surface *surf = NULL;
 
 	COMPUTE_DBG(ctx->screen, "*** evergreen_set_compute_resources: start = %u count = %u\n",
 			start, count);
 
+	if (!surfaces) {
+		for (unsigned i = 0; i < count; ++i)
+			evergreen_unset_cbuf(ctx, 1 + i);
+		return;
+	}
+
 	for (unsigned i = 0; i < count; i++) {
-		/* The First two vertex buffers are reserved for parameters and
-		 * global buffers. */
-		unsigned vtx_id = 2 + i;
-		if (resources[i]) {
-			struct r600_resource_global *buffer =
-				(struct r600_resource_global*)
-				resources[i]->base.texture;
-			if (resources[i]->base.writable) {
-				assert(i+1 < 12);
+		surf = surfaces[i];
+		if (!surf)
+			continue;
 
-				evergreen_set_rat(ctx->cs_shader_state.shader, i+1,
-				(struct r600_resource *)resources[i]->base.texture,
-				buffer->chunk->start_in_dw*4,
-				resources[i]->base.texture->width0);
-			}
+		/* XXX: Implement constant buffers. */
+		assert(surf->writable &&
+		       "Constant buffer compute resources are not supported yet.");
 
-			evergreen_cs_set_vertex_buffer(ctx, vtx_id,
-					buffer->chunk->start_in_dw * 4,
-					resources[i]->base.texture);
-		}
+		/* It is assumed, that surface[i]->texture contains an r600_texture. */
+
+		/* The first RAT is reserved for global buffers. */
+		unsigned rat_id = 1 + i;
+		assert(rat_id < 12);
+
+		evergreen_set_cbuf(ctx, rat_id, surf);
+		evergreen_init_color_surface_rat_tex(ctx, (struct r600_surface *)surf);
 	}
 }
 
@@ -673,7 +697,11 @@ static void evergreen_set_global_binding(
 			first, n);
 
 	if (!resources) {
-		/* XXX: Unset */
+		if (n) {
+			/* evergreen_set_rat_buf creates a new surface. */
+			pipe_surface_reference(&ctx->framebuffer.state.cbufs[0], NULL);
+			evergreen_unset_cbuf(ctx, 0);
+		}
 		return;
 	}
 
@@ -704,7 +732,7 @@ static void evergreen_set_global_binding(
 		*(handles[i]) = util_cpu_to_le32(handle);
 	}
 
-	evergreen_set_rat(ctx, 0, pool->bo, 0, pool->size_in_dw * 4);
+	evergreen_set_rat_buf(ctx, 0, pool->bo, 0, pool->size_in_dw * 4);
 	evergreen_cs_set_vertex_buffer(ctx, 1, 0,
 				(struct pipe_resource*)pool->bo);
 }

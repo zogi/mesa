@@ -1116,6 +1116,7 @@ struct pipe_surface *r600_create_surface_custom(struct pipe_context *pipe,
 	surface->base.width = width;
 	surface->base.height = height;
 	surface->base.u = templ->u;
+	surface->base.writable = templ->writable;
 	return &surface->base;
 }
 

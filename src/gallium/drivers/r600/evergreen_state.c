@@ -45,6 +45,31 @@ static inline unsigned evergreen_array_mode(unsigned mode)
 	}
 }
 
+static inline unsigned evergreen_resource_type(enum pipe_texture_target target)
+{
+	switch (target) {
+	case PIPE_BUFFER:
+		return V_028C70_BUFFER;
+	case PIPE_TEXTURE_1D:
+		return V_028C70_TEXTURE1D;
+	case PIPE_TEXTURE_RECT:
+	case PIPE_TEXTURE_2D:
+		return V_028C70_TEXTURE2D;
+	case PIPE_TEXTURE_3D:
+		return V_028C70_TEXTURE3D;
+	case PIPE_TEXTURE_1D_ARRAY:
+		return V_028C70_TEXTURE1DARRAY;
+	case PIPE_TEXTURE_2D_ARRAY:
+		return V_028C70_TEXTURE2DARRAY;
+	case PIPE_TEXTURE_CUBE:
+	case PIPE_TEXTURE_CUBE_ARRAY:
+		assert(0 && "Can't assign CB_COLOR_INFO resource type to "
+		            "PIPE_TEXTURE_CUBE or PIPE_TEXTURE_CUBE_ARRAY.");
+	default:
+		assert(0 && "Unknown pipe texture target.");
+	}
+}
+
 static uint32_t eg_num_banks(uint32_t nbanks)
 {
 	switch (nbanks) {
@@ -923,7 +948,7 @@ static void evergreen_emit_scissor_state(struct r600_context *rctx, struct r600_
  * to be used for 1D aligned buffers that do not have an associated
  * radeon_surf.
  */
-void evergreen_init_color_surface_rat(struct r600_context *rctx,
+void evergreen_init_color_surface_rat_buf(struct r600_context *rctx,
 					struct r600_surface *surf)
 {
 	struct pipe_resource *pipe_buffer = surf->base.texture;
@@ -961,6 +986,7 @@ void evergreen_init_color_surface_rat(struct r600_context *rctx,
 		| S_028C70_BLEND_BYPASS(1) /* We must set this bit because we
 					    * are using NUMBER_UINT */
 		| S_028C70_RAT(1)
+		| S_028C70_RESOURCE_TYPE(V_028C70_BUFFER)
 		;
 
 	surf->cb_color_attrib = S_028C74_NON_DISP_TILING_ORDER(1);
@@ -975,6 +1001,18 @@ void evergreen_init_color_surface_rat(struct r600_context *rctx,
 
 	surf->cb_color_fmask = surf->cb_color_base;
 	surf->cb_color_fmask_slice = 0;
+}
+
+void evergreen_init_color_surface_rat_tex(struct r600_context *rctx,
+                                          struct r600_surface *surf)
+{
+	struct r600_texture *tex = (struct r600_texture *)surf->base.texture;
+
+	evergreen_init_color_surface(rctx, surf);
+
+	surf->cb_color_info |= S_028C70_RAT(1) |
+		S_028C70_RESOURCE_TYPE(evergreen_resource_type(
+			tex->resource.b.b.target));
 }
 
 void evergreen_init_color_surface(struct r600_context *rctx,
@@ -1144,6 +1182,9 @@ void evergreen_init_color_surface(struct r600_context *rctx,
 	}
 
 	base_offset = rtex->resource.gpu_address;
+
+	color_dim = S_028C78_WIDTH_MAX(rtex->resource.b.b.width0 - 1) |
+	            S_028C78_HEIGHT_MAX(rtex->resource.b.b.height0 - 1);
 
 	/* XXX handle enabling of CB beyond BASE8 which has different offset */
 	surf->cb_color_base = (base_offset + offset) >> 8;
