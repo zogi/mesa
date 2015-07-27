@@ -126,6 +126,7 @@ root_resource::root_resource(clover::device &dev, memory_obj &obj,
       info.width0 = img->width();
       info.height0 = img->height();
       info.depth0 = img->depth();
+      info.array_size = 1;
    } else {
       info.width0 = obj.size();
       info.height0 = 1;
