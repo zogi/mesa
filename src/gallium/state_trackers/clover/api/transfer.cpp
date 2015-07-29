@@ -204,9 +204,22 @@ namespace {
    struct _map {
       static mapping
       get(command_queue &q, T obj, cl_map_flags flags,
-          size_t offset, size_t size) {
+          const vector_t& origin, const vector_t& region,
+          const vector_t& pitch) {
+         size_t offset = dot(pitch, origin);
+         size_t region_size = size(pitch, region);
          return { q, obj->resource(q), flags, true,
-                  {{ offset }}, {{ size, 1, 1 }} };
+                  {{ offset }}, {{ region_size, 1, 1 }}};
+      }
+   };
+
+   template<>
+   struct _map<image *> {
+      static mapping
+      get(command_queue &q, image *obj, cl_map_flags flags,
+          const vector_t& origin, const vector_t& region,
+          const vector_t& pitch) {
+         return { q, obj->resource(q), flags, true, origin, region };
       }
    };
 
@@ -214,8 +227,9 @@ namespace {
    struct _map<void *> {
       static void *
       get(command_queue &q, void *obj, cl_map_flags flags,
-          size_t offset, size_t size) {
-         return (char *)obj + offset;
+          const vector_t& origin, const vector_t& region,
+          const vector_t& pitch) {
+         return (char *)obj + dot(pitch, origin);
       }
    };
 
@@ -223,8 +237,9 @@ namespace {
    struct _map<const void *> {
       static const void *
       get(command_queue &q, const void *obj, cl_map_flags flags,
-          size_t offset, size_t size) {
-         return (const char *)obj + offset;
+          const vector_t& origin, const vector_t& region,
+          const vector_t& pitch) {
+         return (char *)obj + dot(pitch, origin);
       }
    };
 
@@ -240,11 +255,9 @@ namespace {
                 const vector_t &region) {
       return [=, &q](event &) {
          auto dst = _map<T>::get(q, dst_obj, CL_MAP_WRITE,
-                                 dot(dst_pitch, dst_orig),
-                                 size(dst_pitch, region));
+                                 dst_orig, region, dst_pitch);
          auto src = _map<S>::get(q, src_obj, CL_MAP_READ,
-                                 dot(src_pitch, src_orig),
-                                 size(src_pitch, region));
+                                 src_orig, region, src_pitch);
          vector_t v = {};
 
          for (v[2] = 0; v[2] < region[2]; ++v[2]) {
