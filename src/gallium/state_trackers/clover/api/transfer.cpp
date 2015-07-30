@@ -218,8 +218,11 @@ namespace {
       static mapping
       get(command_queue &q, image *obj, cl_map_flags flags,
           const vector_t& origin, const vector_t& region,
-          const vector_t& pitch) {
-         return { q, obj->resource(q), flags, true, origin, region };
+          vector_t& pitch) {
+         mapping res{ q, obj->resource(q), flags, true, origin, region };
+         pitch[1] = res.get_row_pitch();
+         pitch[2] = res.get_slice_pitch();
+         return res;
       }
    };
 
@@ -250,10 +253,10 @@ namespace {
    template<typename T, typename S>
    std::function<void (event &)>
    soft_copy_op(command_queue &q,
-                T dst_obj, const vector_t &dst_orig, const vector_t &dst_pitch,
-                S src_obj, const vector_t &src_orig, const vector_t &src_pitch,
+                T dst_obj, const vector_t &dst_orig, vector_t dst_pitch,
+                S src_obj, const vector_t &src_orig, vector_t src_pitch,
                 const vector_t &region) {
-      return [=, &q](event &) {
+      return [=, &q](event &) mutable {
          auto dst = _map<T>::get(q, dst_obj, CL_MAP_WRITE,
                                  dst_orig, region, dst_pitch);
          auto src = _map<S>::get(q, src_obj, CL_MAP_READ,

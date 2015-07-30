@@ -122,6 +122,14 @@ namespace clover {
          return (T *)p;
       }
 
+      unsigned get_row_pitch() const {
+         return pxfer->stride;
+      }
+
+      unsigned get_slice_pitch() const {
+         return pxfer->layer_stride;
+      }
+
    private:
       pipe_context *pctx;
       pipe_transfer *pxfer;
