@@ -101,7 +101,7 @@ struct r600_resource* r600_compute_buffer_alloc_vram(
 
 
 static void evergreen_set_rat(
-	struct r600_pipe_compute *pipe,
+	struct r600_context *ctx,
 	unsigned id,
 	struct r600_resource* bo,
 	int start,
@@ -109,15 +109,12 @@ static void evergreen_set_rat(
 {
 	struct pipe_surface rat_templ;
 	struct r600_surface *surf = NULL;
-	struct r600_context *rctx = NULL;
 
 	assert(id < 12);
 	assert((size & 3) == 0);
 	assert((start & 0xFF) == 0);
 
-	rctx = pipe->ctx;
-
-	COMPUTE_DBG(rctx->screen, "bind rat: %i \n", id);
+	COMPUTE_DBG(ctx->screen, "bind rat: %i \n", id);
 
 	/* Create the RAT surface */
 	memset(&rat_templ, 0, sizeof(rat_templ));
@@ -127,21 +124,21 @@ static void evergreen_set_rat(
 	rat_templ.u.tex.last_layer = 0;
 
 	/* Add the RAT the list of color buffers */
-	pipe->ctx->framebuffer.state.cbufs[id] = pipe->ctx->b.b.create_surface(
-		(struct pipe_context *)pipe->ctx,
+	ctx->framebuffer.state.cbufs[id] = ctx->b.b.create_surface(
+		(struct pipe_context *)ctx,
 		(struct pipe_resource *)bo, &rat_templ);
 
 	/* Update the number of color buffers */
-	pipe->ctx->framebuffer.state.nr_cbufs =
-		MAX2(id + 1, pipe->ctx->framebuffer.state.nr_cbufs);
+	ctx->framebuffer.state.nr_cbufs =
+		MAX2(id + 1, ctx->framebuffer.state.nr_cbufs);
 
 	/* Update the cb_target_mask
 	 * XXX: I think this is a potential spot for bugs once we start doing
 	 * GL interop.  cb_target_mask may be modified in the 3D sections
 	 * of this driver. */
-	pipe->ctx->compute_cb_target_mask |= (0xf << (id * 4));
+	ctx->compute_cb_target_mask |= (0xf << (id * 4));
 
-	surf = (struct r600_surface*)pipe->ctx->framebuffer.state.cbufs[id];
+	surf = (struct r600_surface*)ctx->framebuffer.state.cbufs[id];
 	evergreen_init_color_surface_rat(rctx, surf);
 }
 
@@ -707,7 +704,7 @@ static void evergreen_set_global_binding(
 		*(handles[i]) = util_cpu_to_le32(handle);
 	}
 
-	evergreen_set_rat(ctx->cs_shader_state.shader, 0, pool->bo, 0, pool->size_in_dw * 4);
+	evergreen_set_rat(ctx, 0, pool->bo, 0, pool->size_in_dw * 4);
 	evergreen_cs_set_vertex_buffer(ctx, 1, 0,
 				(struct pipe_resource*)pool->bo);
 }
