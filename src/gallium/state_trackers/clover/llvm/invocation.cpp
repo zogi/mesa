@@ -476,6 +476,15 @@ namespace {
             continue;
          }
 
+         // Sampler
+         if (type_name == "sampler_t") {
+            args.push_back(module::argument(module::argument::sampler,
+                                            arg_store_size, target_size,
+                                            target_align,
+                                            module::argument::zero_ext));
+            continue;
+         }
+
          // Image size implicit argument
          if (type_name == "__llvm_image_size") {
             args.push_back(module::argument(module::argument::scalar,
