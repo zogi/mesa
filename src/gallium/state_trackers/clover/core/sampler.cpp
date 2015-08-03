@@ -23,6 +23,11 @@
 #include "core/sampler.hpp"
 #include "pipe/p_state.h"
 
+// CLK_* constants are defined in libclc (include/clc/image/image_defines.h)
+#define __CLOVER_NORM_MODE_BITS(x) (x)
+#define __CLOVER_ADDR_MODE_BITS(x) (((x)-CL_ADDRESS_NONE)<<1)
+#define __CLOVER_FILT_MODE_BITS(x) (((x)-CL_FILTER_NEAREST)<<4)
+
 using namespace clover;
 
 sampler::sampler(clover::context &ctx, bool norm_mode,
@@ -45,6 +50,13 @@ sampler::addr_mode() {
 cl_filter_mode
 sampler::filter_mode() {
    return _filter_mode;
+}
+
+cl_uint
+sampler::bit_field() const {
+   return __CLOVER_NORM_MODE_BITS(_norm_mode) |
+          __CLOVER_ADDR_MODE_BITS(_addr_mode) |
+          __CLOVER_FILT_MODE_BITS(_filter_mode);
 }
 
 void *

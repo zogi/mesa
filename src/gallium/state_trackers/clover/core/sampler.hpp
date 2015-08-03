@@ -40,6 +40,7 @@ namespace clover {
       bool norm_mode();
       cl_addressing_mode addr_mode();
       cl_filter_mode filter_mode();
+      cl_uint bit_field() const;
 
       const intrusive_ref<clover::context> context;
 

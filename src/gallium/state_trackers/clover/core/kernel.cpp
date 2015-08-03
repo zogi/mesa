@@ -575,6 +575,13 @@ kernel::sampler_argument::set(size_t size, const void *value) {
 void
 kernel::sampler_argument::bind(exec_context &ctx,
                                const module::argument &marg) {
+   auto v = bytes(s->bit_field());
+
+   extend(v, module::argument::zero_ext, marg.target_size);
+   byteswap(v, ctx.q->device().endianness());
+   align(ctx.input, marg.target_align);
+   insert(ctx.input, v);
+
    st = s->bind(*ctx.q);
    ctx.samplers.push_back(st);
 }
