@@ -371,12 +371,13 @@ namespace {
       return kernel_node;
    }
 
-   llvm::MDNode*
-   node_from_op_checked(const llvm::MDOperand &md_operand,
-                        llvm::StringRef expect_name,
-                        unsigned expect_num_args)
+   const llvm::MDNode *
+   get_operand_checked(const llvm::MDNode *parent,
+                       const unsigned op_idx,
+                       const llvm::StringRef expect_name,
+                       const unsigned expect_num_args)
    {
-      auto node = llvm::cast<llvm::MDNode>(md_operand);
+      auto node = llvm::cast<llvm::MDNode>(parent->getOperand(op_idx));
       assert(node->getNumOperands() == expect_num_args &&
              "Wrong number of operands.");
 
@@ -399,10 +400,13 @@ namespace {
       auto num_args = kernel_func->getArgumentList().size();
 
       auto kernel_node = get_kernel_metadata(kernel_func);
-      auto aq = node_from_op_checked(kernel_node->getOperand(2),
-                                     "kernel_arg_access_qual", num_args + 1);
-      auto ty = node_from_op_checked(kernel_node->getOperand(3),
-                                     "kernel_arg_type", num_args + 1);
+      if (!kernel_node)
+         return std::vector<kernel_arg_md>(num_args, kernel_arg_md("", ""));
+
+      auto aq = get_operand_checked(kernel_node, 2, "kernel_arg_access_qual",
+                                    num_args + 1);
+      auto ty = get_operand_checked(kernel_node, 3, "kernel_arg_type",
+                                    num_args + 1);
 
       std::vector<kernel_arg_md> res;
       res.reserve(num_args);
